@@ -182,20 +182,7 @@ int main() {
                   check_car_s += ((double)prev_size * 0.02 * check_speed);
                   //check s values greater than mine and s gap
                   if((check_car_s > car_s) && ((check_car_s - car_s) < 20)){
-                    //ref_vel = 29.5; //mph
                     too_close = true;
-                    // if(lane > 0){
-                    //   lane = 0;
-                    // }
-                    //Check if it is safe to change lane, first to the left then to the right
-                    // if(CheckLaneChange(LCL, lane, sensor_fusion, state_car)){
-                    //   lane--;
-                    //   CarState = LCL;
-                    // }
-                    // else if(CheckLaneChange(LCR, lane, sensor_fusion, state_car)){
-                    //   lane++;
-                    //   CarState = LCR;
-                    // }
                   }
                 }
               }
@@ -462,9 +449,6 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
       centerLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
       rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
     }
-
-    //It is not being considered to pass 2 lanes at once
-    //rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
   }
   
   //Center Lane Costs
@@ -509,9 +493,6 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
       centerLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
       leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
     }
-
-    //It is not being considered to pass 2 lanes at once
-    //leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
   }
 
   //Process the new state
