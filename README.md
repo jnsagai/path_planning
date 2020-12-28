@@ -1,6 +1,5 @@
 [image1]: ./images/fsm.png "FSM"
 [image2]: ./images/spline.png "Path"
-[video1]: ./images/video.mp4 "Video"
 
 # Udacity Path Planning Project
 Self-Driving Car Engineer Nanodegree Program
@@ -121,8 +120,6 @@ It was used the [spline C++ tool](http://kluge.in-chemnitz.de/opensource/spline/
 
 ## Demonstration
 
-The following video demonstrate the application of the behavior planning and the Trajectory generation where the ego car safely overtake a car.
-
-![alt text][video1]
+The following [video](https://github.com/jnsagai/path_planning/blob/master/images/video.mp4) demonstrate the application of the behavior planning and the Trajectory generation where the ego car safely overtake a car.
 
 
