@@ -61,8 +61,8 @@ double CarSpeedCost(double targetCarSpeed);
 double CarDistanceCost(double targetCarDistance);
 int GetCarLane(double d);
 
-//Weights for the Cost Functions (Speed cost and distance cost)
-vector<double> weights = {10, 2};
+//Weights for the Cost Functions (Speed cost, distance cost and Change Lane cost)
+vector<double> weights = {5, 10, 3};
 
 int main() {
   uWS::Hub h;
@@ -103,8 +103,6 @@ int main() {
 
   //start with lane 1
   int lane = 1;
-
- 
 
   t_StateType CarState = RD;
 
@@ -183,7 +181,7 @@ int main() {
                   //If  using previous points can project s value out
                   check_car_s += ((double)prev_size * 0.02 * check_speed);
                   //check s values greater than mine and s gap
-                  if((check_car_s > car_s) && ((check_car_s - car_s) < 15)){
+                  if((check_car_s > car_s) && ((check_car_s - car_s) < 20)){
                     //ref_vel = 29.5; //mph
                     too_close = true;
                     // if(lane > 0){
@@ -419,12 +417,6 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
   right_car.car_speed = 50.0;
   center_car.car_speed = 50.0;
 
-  // //Sort the sensor fusion info by the s value
-  // std::sort(sensor_fusion.begin(), sensor_fusion.end(),
-  //           [](const std::vector<double>& a, const std::vector<double>& b){
-  //             return a[5] < b[5];
-  //           });
-
   //Declare some variables for the target car states
   double target_car_s, target_car_d, vx, vy, target_car_speed;
 
@@ -436,17 +428,17 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
     vy = sensor_fusion[i][4];
     target_car_speed = sqrt(vx*vx + vy*vy);
 
-    if(GetCarLane(target_car_d) == 0 && target_car_s > car_state.car_s && target_car_s < (left_car.car_s + car_state.car_s))
+    if(GetCarLane(target_car_d) == 0 && target_car_s > car_state.car_s && target_car_s < (left_car.car_s + car_state.car_s) && (target_car_s - car_state.car_s) <= 75)
     {
       left_car.car_s = target_car_s - car_state.car_s;
       left_car.car_speed = target_car_speed;
     }
-    else if(GetCarLane(target_car_d) == 1 && target_car_s > car_state.car_s && target_car_s < (center_car.car_s + car_state.car_s))
+    else if(GetCarLane(target_car_d) == 1 && target_car_s > car_state.car_s && target_car_s < (center_car.car_s + car_state.car_s) && (target_car_s - car_state.car_s) <= 75)
     {
       center_car.car_s = target_car_s - car_state.car_s;
       center_car.car_speed = target_car_speed;
     }
-    else if(GetCarLane(target_car_d) == 2 && target_car_s > car_state.car_s && target_car_s < (right_car.car_s + car_state.car_s))
+    else if(GetCarLane(target_car_d) == 2 && target_car_s > car_state.car_s && target_car_s < (right_car.car_s + car_state.car_s) && (target_car_s - car_state.car_s) <= 75)
     {
       right_car.car_s = target_car_s - car_state.car_s;
       right_car.car_speed = target_car_speed;
@@ -462,15 +454,17 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
     //Let's check the cost for lane change right    
     //Check whether it is possible to lane change right
     if(CheckLaneChange(LCR, currentLane, sensor_fusion, car_state)){
-      centerLaneCost = CarSpeedCost(center_car.car_speed) * costFuncWeights[0] + CarDistanceCost(center_car.car_s) * costFuncWeights[1];
+      centerLaneCost = CarSpeedCost(center_car.car_speed) * costFuncWeights[0] + CarDistanceCost(center_car.car_s) * costFuncWeights[1] + costFuncWeights[2];
+      rightLaneCost = CarSpeedCost(right_car.car_speed) * costFuncWeights[0] + CarDistanceCost(right_car.car_s) * costFuncWeights[1] + costFuncWeights[2];
     }
     //If it is not possible to change lane, the cost is the highest
     else{
-      centerLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+      centerLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
+      rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
     }
 
     //It is not being considered to pass 2 lanes at once
-    rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+    //rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
   }
   
   //Center Lane Costs
@@ -481,21 +475,21 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
     //Let's check the cost for lane change right    
     //Check whether it is possible to lane change right
     if(CheckLaneChange(LCR, currentLane, sensor_fusion, car_state)){
-      rightLaneCost = CarSpeedCost(right_car.car_speed) * costFuncWeights[0] + CarDistanceCost(right_car.car_s) * costFuncWeights[1];
+      rightLaneCost = CarSpeedCost(right_car.car_speed) * costFuncWeights[0] + CarDistanceCost(right_car.car_s) * costFuncWeights[1] + costFuncWeights[2];
     }
     //If it is not possible to change lane, the cost is the highest
     else{
-      rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+      rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
     }
 
     //Let's check the cost for lane change left    
     //Check whether it is possible to lane change left
     if(CheckLaneChange(LCL, currentLane, sensor_fusion, car_state)){
-      leftLaneCost = CarSpeedCost(left_car.car_speed) * costFuncWeights[0] + CarDistanceCost(left_car.car_s) * costFuncWeights[1];
+      leftLaneCost = CarSpeedCost(left_car.car_speed) * costFuncWeights[0] + CarDistanceCost(left_car.car_s) * costFuncWeights[1] + costFuncWeights[2];
     }
     //If it is not possible to change lane, the cost is the highest
     else{
-      leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+      leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
     }
   }
 
@@ -507,15 +501,17 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
     //Let's check the cost for lane change left    
     //Check whether it is possible to lane change left
     if(CheckLaneChange(LCL, currentLane, sensor_fusion, car_state)){
-      centerLaneCost = CarSpeedCost(center_car.car_speed) * costFuncWeights[0] + CarDistanceCost(center_car.car_s) * costFuncWeights[1];
+      centerLaneCost = CarSpeedCost(center_car.car_speed) * costFuncWeights[0] + CarDistanceCost(center_car.car_s) * costFuncWeights[1] + costFuncWeights[2];
+      leftLaneCost = CarSpeedCost(left_car.car_speed) * costFuncWeights[0] + CarDistanceCost(left_car.car_s) * costFuncWeights[1] + costFuncWeights[2];
     }
     //If it is not possible to change lane, the cost is the highest
     else{
-      centerLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+      centerLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
+      leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
     }
 
     //It is not being considered to pass 2 lanes at once
-    leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+    //leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1] + costFuncWeights[2];
   }
 
   //Process the new state
@@ -580,7 +576,7 @@ bool IsSafeToChangeLane(vector<vector<double>> cars_info, const t_CarState &car_
             });
 
   //Declare some variables for the side car states
-  double side_car_s, vx, vy, side_car_speed, side_rel_vel, side_rel_s;
+  double side_car_s, vx, vy, side_car_speed, side_rel_vel, side_rel_s, future_car_s;
 
   //Check whether there is any car inside the unsafe s zone
   for(unsigned int i = 0; i < cars_info.size(); ++i){
@@ -589,10 +585,11 @@ bool IsSafeToChangeLane(vector<vector<double>> cars_info, const t_CarState &car_
     vy = cars_info[i][4];
     side_car_speed = sqrt(vx*vx + vy*vy);
     side_rel_vel = car_state.car_speed - side_car_speed; //Relative velocity of the side car related to the ego car
-    side_rel_s = (side_car_s + (side_rel_vel * 0.3)); //Relative side car s value after 0.3s          
+    side_rel_s = (side_car_s + (side_rel_vel * 0.5)); //Relative side car s value after 0.5s      
+    future_car_s = (car_state.car_s + (car_state.car_speed * 0.5));    
 
     if(((side_car_s < (car_state.car_s + offset_safe_s_sup)) && (side_car_s > (car_state.car_s - offset_safe_s_inf)))
-      || ((side_rel_s < (car_state.car_s + offset_safe_s_sup)) && (side_rel_s > (car_state.car_s - offset_safe_s_inf)))){
+      || ((side_rel_s < (future_car_s + offset_safe_s_sup)) && (side_rel_s > (future_car_s - offset_safe_s_inf)))){
       //The side car is inside the unsafe zone!!!
       return false;
     }
@@ -610,7 +607,7 @@ double CarSpeedCost(double targetCarSpeed)
 
 double CarDistanceCost(double targetCarDistance)
 {
-  double cost = exp( -5 * (saturation(targetCarDistance, 100.0) / 100.0));
+  double cost = exp( -5 * (saturation(targetCarDistance, 75.0) / 75.0));
   
   return cost;
 }
