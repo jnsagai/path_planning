@@ -62,7 +62,7 @@ double CarDistanceCost(double targetCarDistance);
 int GetCarLane(double d);
 
 //Weights for the Cost Functions (Speed cost and distance cost)
-vector<double> weights = {5, 10};
+vector<double> weights = {10, 2};
 
 int main() {
   uWS::Hub h;
@@ -183,7 +183,7 @@ int main() {
                   //If  using previous points can project s value out
                   check_car_s += ((double)prev_size * 0.02 * check_speed);
                   //check s values greater than mine and s gap
-                  if((check_car_s > car_s) && ((check_car_s - car_s) < 20)){
+                  if((check_car_s > car_s) && ((check_car_s - car_s) < 15)){
                     //ref_vel = 29.5; //mph
                     too_close = true;
                     // if(lane > 0){
@@ -410,10 +410,14 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
   //New State
   t_StateType newState = LK;
   
-  //Initialize with high s values
+  //Initialize with high s and speed values
   left_car.car_s = 9999;
   right_car.car_s = 9999;
   center_car.car_s = 9999;
+
+  left_car.car_speed = 50.0;
+  right_car.car_speed = 50.0;
+  center_car.car_speed = 50.0;
 
   // //Sort the sensor fusion info by the s value
   // std::sort(sensor_fusion.begin(), sensor_fusion.end(),
@@ -432,19 +436,19 @@ t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>
     vy = sensor_fusion[i][4];
     target_car_speed = sqrt(vx*vx + vy*vy);
 
-    if(GetCarLane(target_car_d) == 0 && target_car_s > car_state.car_s && target_car_s < left_car.car_s)
+    if(GetCarLane(target_car_d) == 0 && target_car_s > car_state.car_s && target_car_s < (left_car.car_s + car_state.car_s))
     {
-      left_car.car_s = target_car_s;
+      left_car.car_s = target_car_s - car_state.car_s;
       left_car.car_speed = target_car_speed;
     }
-    else if(GetCarLane(target_car_d) == 1 && target_car_s > car_state.car_s && target_car_s < center_car.car_s)
+    else if(GetCarLane(target_car_d) == 1 && target_car_s > car_state.car_s && target_car_s < (center_car.car_s + car_state.car_s))
     {
-      center_car.car_s = target_car_s;
+      center_car.car_s = target_car_s - car_state.car_s;
       center_car.car_speed = target_car_speed;
     }
-    else if(GetCarLane(target_car_d) == 2 && target_car_s > car_state.car_s && target_car_s < right_car.car_s)
+    else if(GetCarLane(target_car_d) == 2 && target_car_s > car_state.car_s && target_car_s < (right_car.car_s + car_state.car_s))
     {
-      right_car.car_s = target_car_s;
+      right_car.car_s = target_car_s - car_state.car_s;
       right_car.car_speed = target_car_speed;
     }
   }
@@ -564,7 +568,7 @@ bool CheckLaneChange(const t_StateType &checkLane,const int &currentLane,const v
   }
 
   //Check whether is safe to change lane
-  return(IsSafeToChangeLane(side_cars_info, car_state, 5.0, 10.0));
+  return(IsSafeToChangeLane(side_cars_info, car_state, 15.0, 20.0));
 }
 
 bool IsSafeToChangeLane(vector<vector<double>> cars_info, const t_CarState &car_state, const double &offset_safe_s_sup, const double &offset_safe_s_inf)
