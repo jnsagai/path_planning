@@ -1,6 +1,5 @@
 [image1]: ./images/fsm.png "FSM"
 [image2]: ./images/spline.png "Path"
-[video1]: ./images/video.mp4 "Video"
 
 # Udacity Path Planning Project
 Self-Driving Car Engineer Nanodegree Program
@@ -118,10 +117,4 @@ Instead of always generating a new trajectory from scratch for each interaction,
 It was used the [spline C++ tool](http://kluge.in-chemnitz.de/opensource/spline/) for generating the spline trajectory. The next image demonstrates a path using this strategy:
 
 ![alt text][image2]
-
-## Example
-
-Follows a demonstration of the result of the Behavior Planner and the Trajectory Generator in action:
-
-![alt text][video1]
 
