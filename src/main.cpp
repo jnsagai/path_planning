@@ -51,9 +51,18 @@ typedef struct s_PreviousCarPath{
   vector<double> previous_path_y;
 }t_PreviousCarPath;
 
+
+#define saturation(x, y) (x > y ? y : x)
 t_NextCarValues CalcNextCarValues(const int &lane, const double &ref_vel, const t_WayPoints &map_waypoints, const t_CarState &car_state, const t_PreviousCarPath &previous_path);
 bool CheckLaneChange(const t_StateType &checkLane,const int &currentLane,const vector<vector<double>> sensor_fusion, const t_CarState &car_state);
 bool IsSafeToChangeLane(vector<vector<double>> cars_info, const t_CarState &car_state, const double &offset_safe_s_sup, const double &offset_safe_s_inf);
+t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>> sensor_fusion, const int &currentLane, vector<double> costFuncWeights);
+double CarSpeedCost(double targetCarSpeed);
+double CarDistanceCost(double targetCarDistance);
+int GetCarLane(double d);
+
+//Weights for the Cost Functions (Speed cost and distance cost)
+vector<double> weights = {5, 10};
 
 int main() {
   uWS::Hub h;
@@ -174,21 +183,21 @@ int main() {
                   //If  using previous points can project s value out
                   check_car_s += ((double)prev_size * 0.02 * check_speed);
                   //check s values greater than mine and s gap
-                  if((check_car_s > car_s) && ((check_car_s - car_s) < 15)){
+                  if((check_car_s > car_s) && ((check_car_s - car_s) < 20)){
                     //ref_vel = 29.5; //mph
                     too_close = true;
                     // if(lane > 0){
                     //   lane = 0;
                     // }
                     //Check if it is safe to change lane, first to the left then to the right
-                    if(CheckLaneChange(LCL, lane, sensor_fusion, state_car)){
-                      lane--;
-                      CarState = LCL;
-                    }
-                    else if(CheckLaneChange(LCR, lane, sensor_fusion, state_car)){
-                      lane++;
-                      CarState = LCR;
-                    }
+                    // if(CheckLaneChange(LCL, lane, sensor_fusion, state_car)){
+                    //   lane--;
+                    //   CarState = LCL;
+                    // }
+                    // else if(CheckLaneChange(LCR, lane, sensor_fusion, state_car)){
+                    //   lane++;
+                    //   CarState = LCR;
+                    // }
                   }
                 }
               }
@@ -197,7 +206,18 @@ int main() {
               }
               else if(ref_vel < 49.5){
                 ref_vel += 0.4;
-              }            
+              }
+
+              //Get the new state
+              t_StateType newState = GetNewState(state_car, sensor_fusion, lane, weights);
+              if(newState == LCL){
+                lane--;
+                CarState = LCL;
+              }
+              else if(newState == LCR){
+                lane++;
+                CarState = LCR;
+              }
               break;
             }
             case LCL:
@@ -379,6 +399,134 @@ t_NextCarValues CalcNextCarValues(const int &lane, const double &ref_vel, const 
   return {next_x_vals, next_y_vals};
 }
 
+t_StateType GetNewState(const t_CarState &car_state, const vector<vector<double>> sensor_fusion, const int &currentLane, vector<double> costFuncWeights)
+{
+  //Get the nearest cars in front of ego car
+  t_CarState left_car, right_car, center_car;
+
+  //Lane Costs
+  double leftLaneCost, rightLaneCost, centerLaneCost;
+
+  //New State
+  t_StateType newState = LK;
+  
+  //Initialize with high s values
+  left_car.car_s = 9999;
+  right_car.car_s = 9999;
+  center_car.car_s = 9999;
+
+  // //Sort the sensor fusion info by the s value
+  // std::sort(sensor_fusion.begin(), sensor_fusion.end(),
+  //           [](const std::vector<double>& a, const std::vector<double>& b){
+  //             return a[5] < b[5];
+  //           });
+
+  //Declare some variables for the target car states
+  double target_car_s, target_car_d, vx, vy, target_car_speed;
+
+  //Get the nearest cars on each lane
+  for(unsigned int i = 0; i < sensor_fusion.size(); ++i){
+    target_car_s = sensor_fusion[i][5];
+    target_car_d = sensor_fusion[i][6];
+    vx = sensor_fusion[i][3];
+    vy = sensor_fusion[i][4];
+    target_car_speed = sqrt(vx*vx + vy*vy);
+
+    if(GetCarLane(target_car_d) == 0 && target_car_s > car_state.car_s && target_car_s < left_car.car_s)
+    {
+      left_car.car_s = target_car_s;
+      left_car.car_speed = target_car_speed;
+    }
+    else if(GetCarLane(target_car_d) == 1 && target_car_s > car_state.car_s && target_car_s < center_car.car_s)
+    {
+      center_car.car_s = target_car_s;
+      center_car.car_speed = target_car_speed;
+    }
+    else if(GetCarLane(target_car_d) == 2 && target_car_s > car_state.car_s && target_car_s < right_car.car_s)
+    {
+      right_car.car_s = target_car_s;
+      right_car.car_speed = target_car_speed;
+    }
+  }
+
+  //Calculate the cost for each path
+  //Left Lane Costs
+  if(currentLane == 0){
+    //Let's check the cost for keeping in this lane
+    leftLaneCost = CarSpeedCost(left_car.car_speed) * costFuncWeights[0] + CarDistanceCost(left_car.car_s) * costFuncWeights[1];
+
+    //Let's check the cost for lane change right    
+    //Check whether it is possible to lane change right
+    if(CheckLaneChange(LCR, currentLane, sensor_fusion, car_state)){
+      centerLaneCost = CarSpeedCost(center_car.car_speed) * costFuncWeights[0] + CarDistanceCost(center_car.car_s) * costFuncWeights[1];
+    }
+    //If it is not possible to change lane, the cost is the highest
+    else{
+      centerLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+    }
+
+    //It is not being considered to pass 2 lanes at once
+    rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+  }
+  
+  //Center Lane Costs
+  else if(currentLane == 1){
+    //Let's check the cost for keeping in this lane
+    centerLaneCost = CarSpeedCost(center_car.car_speed) * costFuncWeights[0] + CarDistanceCost(center_car.car_s) * costFuncWeights[1];
+
+    //Let's check the cost for lane change right    
+    //Check whether it is possible to lane change right
+    if(CheckLaneChange(LCR, currentLane, sensor_fusion, car_state)){
+      rightLaneCost = CarSpeedCost(right_car.car_speed) * costFuncWeights[0] + CarDistanceCost(right_car.car_s) * costFuncWeights[1];
+    }
+    //If it is not possible to change lane, the cost is the highest
+    else{
+      rightLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+    }
+
+    //Let's check the cost for lane change left    
+    //Check whether it is possible to lane change left
+    if(CheckLaneChange(LCL, currentLane, sensor_fusion, car_state)){
+      leftLaneCost = CarSpeedCost(left_car.car_speed) * costFuncWeights[0] + CarDistanceCost(left_car.car_s) * costFuncWeights[1];
+    }
+    //If it is not possible to change lane, the cost is the highest
+    else{
+      leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+    }
+  }
+
+  //Right Lane Costs
+  if(currentLane == 2){
+    //Let's check the cost for keeping in this lane
+    rightLaneCost = CarSpeedCost(right_car.car_speed) * costFuncWeights[0] + CarDistanceCost(right_car.car_s) * costFuncWeights[1];
+
+    //Let's check the cost for lane change left    
+    //Check whether it is possible to lane change left
+    if(CheckLaneChange(LCL, currentLane, sensor_fusion, car_state)){
+      centerLaneCost = CarSpeedCost(center_car.car_speed) * costFuncWeights[0] + CarDistanceCost(center_car.car_s) * costFuncWeights[1];
+    }
+    //If it is not possible to change lane, the cost is the highest
+    else{
+      centerLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+    }
+
+    //It is not being considered to pass 2 lanes at once
+    leftLaneCost = 1 * costFuncWeights[0] + 1 * costFuncWeights[1];
+  }
+
+  //Process the new state
+  if(currentLane == 0){ leftLaneCost <= centerLaneCost ? newState = LK : newState = LCR; } //Current in Left Lane 
+  else if(currentLane == 2){ rightLaneCost <= centerLaneCost ? newState = LK : newState = LCL; } //Current in Right Lane
+  //Current in center lane
+  else{
+    if(centerLaneCost <= rightLaneCost && centerLaneCost <= leftLaneCost) { newState = LK; }
+    else if (rightLaneCost < centerLaneCost && rightLaneCost <= leftLaneCost) { newState = LCR; }
+    else { newState =  LCL; }
+  }
+
+  return newState;
+}
+
 bool CheckLaneChange(const t_StateType &checkLane,const int &currentLane,const vector<vector<double>> sensor_fusion, const t_CarState &car_state)
 {
   vector<vector<double>> side_cars_info;
@@ -447,4 +595,29 @@ bool IsSafeToChangeLane(vector<vector<double>> cars_info, const t_CarState &car_
   }
   
   return true;
+}
+
+double CarSpeedCost(double targetCarSpeed)
+{
+  double cost = 1 - (targetCarSpeed / 50);
+  
+  return cost;
+}
+
+double CarDistanceCost(double targetCarDistance)
+{
+  double cost = exp( -5 * (saturation(targetCarDistance, 100.0) / 100.0));
+  
+  return cost;
+}
+
+int GetCarLane(double d)
+{
+  int carLane = 0;
+
+  if (d >= 0 && d < 4){carLane = 0;}
+  else if (d >=4 && d < 8){carLane = 1;}
+  else if (d >=8 && d <= 12){carLane = 2;}
+
+  return carLane;
 }
