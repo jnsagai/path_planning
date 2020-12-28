@@ -1,4 +1,6 @@
 [image1]: ./images/fsm.png "FSM"
+[image2]: ./images/spline.png "Path"
+[video1]: ./images/video.mp4 "Video"
 
 # Udacity Path Planning Project
 Self-Driving Car Engineer Nanodegree Program
@@ -112,3 +114,13 @@ In order to decide which State shall be executed for the FSM, a set of cost func
 ## Path Generator
 
 Based on the current lane as starting point and the goal lane as ending point, a path is create based on a list of widely spaced (x, y) waypoints, evenly spaced at 30m, then the waypoints are interpolated with a spline and filled in with more points that control speed.
+Instead of always generating a new trajectory from scracth for each iteraction, the last waypoints from the previous spline are used in order to always have a smooth transition between the last trajectory and the current one. Using this technique the jerk value stays under safety range.
+It was used the [spline C++ tool](http://kluge.in-chemnitz.de/opensource/spline/) for generating the spline trajectory. The next image demonstrate a path using this strategy:
+
+![alt text][image2]
+
+## Example
+
+Follows an demonstration of the result of the Behavior Planner and the Trajectory Generator in action:
+
+![alt text][video1]
