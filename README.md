@@ -1,4 +1,6 @@
-# CarND-Path-Planning-Project
+[image1]: ./images/fsm.png "FSM"
+
+# Udacity Path Planning Project
 Self-Driving Car Engineer Nanodegree Program
    
 ### Simulator.
@@ -10,7 +12,7 @@ sudo chmod u+x {simulator_file_name}
 ```
 
 ### Goals
-In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
+The goal of this project is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. It is provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
 
 #### The map of the highway is in data/highway_map.txt
 Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoint's map coordinate position, the s value is the distance along the road to get to that waypoint in meters, the dx and dy values define the unit normal vector pointing outward of the highway loop.
@@ -65,10 +67,6 @@ the path has processed since last time.
 
 2. There will be some latency between the simulator running and the path planner returning a path, with optimized code usually its not very long maybe just 1-3 time steps. During this delay the simulator will continue using points that it was last given, because of this its a good idea to store the last points you have used so you can have a smooth transition. previous_path_x, and previous_path_y can be helpful for this transition since they show the last points given to the simulator controller with the processed points already removed. You would either return a path that extends this previous path or make sure to create a new path that has a smooth transition with this last path.
 
-## Tips
-
-A really helpful resource for doing this project and creating smooth trajectories was using http://kluge.in-chemnitz.de/opensource/spline/, the spline function is in a single hearder file is really easy to use.
-
 ---
 
 ## Dependencies
@@ -92,54 +90,25 @@ A really helpful resource for doing this project and creating smooth trajectorie
     git checkout e94b6e1
     ```
 
-## Editor Settings
+## Behavior Planner
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+The car behavior is controlled by a behavior planner based on a Finate State Machine with 4 distinct state, as show in the image below:
+* Ready: Initial state, used to first set-up the initial car speed and acceleration, then occurs the transition to Keep Lane State;
+* Keep Lane State: In this state the car try to keep road speed whenever is possible by accelerating until reach this limit. If a car appears in front of the vehicle in this state, the car desaccelerate until a safe distance is ensured. Another feature of this state is to evaluate the cost function to performe the transition to other states, or to keep in the same state. For each lane it is evaluated a cost and, according to this cost, the new state is computed.
+* Change Lane Left / Right: During this state the car its lane to the immediate side lane. The car keeps in this state until it is ensured that the transition to a new lane is completed. After that, the FSM returns to Keep Lane State.
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+![alt text][image1]
 
-## Code Style
+## Cost Function
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+In order to decide which State shall be executed for the FSM, a set of cost functions was designed. The main goals of the cost function are to keep the car in the highest speed as possible (obeying the road speed limit) and also avoid collision with other vehicles. For each cost function a parametized weight is defined and used to calibrate the sensitivity of each function. The following cost functions were implemented:
+* Car Speed Cost: Penalize paths where the nearest car in the path has a speed lower than the road speed limit.
+  - cost = 1 - (targetCarSpeed - 50)
+* Car Distance Cost: Penalize paths where the nearest car in the path is close to the ego car. The maximum range of actuation is 75m.
+  - cost = exp( -5 * (min(targetCarDistance, 75.0) / 75.0))
+* Change Lane Cost: Try to keep the car in the current lane in order to avoid unnecessary lane change, for confort reasons.
+  - cost = Constant Value
 
-## Project Instructions and Rubric
+## Path Generator
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
-
+Based on the current lane as starting point and the goal lane as ending point, a path is create based on a list of widely spaced (x, y) waypoints, evenly spaced at 30m, then the waypoints are interpolated with a spline and filled in with more points that control speed.
