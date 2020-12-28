@@ -94,33 +94,34 @@ the path has processed since last time.
 
 ## Behavior Planner
 
-The car behavior is controlled by a behavior planner based on a Finate State Machine with 4 distinct state, as show in the image below:
+The car behavior is controlled by a behavior planner based on a Finite State Machine with 4 distinct states, as shown in the image below:
 * Ready: Initial state, used to first set-up the initial car speed and acceleration, then occurs the transition to Keep Lane State;
-* Keep Lane State: In this state the car try to keep road speed whenever is possible by accelerating until reach this limit. If a car appears in front of the vehicle in this state, the car desaccelerate until a safe distance is ensured. Another feature of this state is to evaluate the cost function to performe the transition to other states, or to keep in the same state. For each lane it is evaluated a cost and, according to this cost, the new state is computed.
+* Keep Lane State: In this state, the car tries to keep road speed whenever is possible by accelerating until reaches this limit. If a car appears in front of the vehicle in this state, the car disaccelerate until a safe distance is ensured. Another feature of this state is to evaluate the cost function to perform the transition to other states, or to keep in the same state. For each lane it is evaluated a cost and, according to this cost, the new state is computed.
 * Change Lane Left / Right: During this state the car its lane to the immediate side lane. The car keeps in this state until it is ensured that the transition to a new lane is completed. After that, the FSM returns to Keep Lane State.
 
 ![alt text][image1]
 
 ## Cost Function
 
-In order to decide which State shall be executed for the FSM, a set of cost functions was designed. The main goals of the cost function are to keep the car in the highest speed as possible (obeying the road speed limit) and also avoid collision with other vehicles. For each cost function a parametized weight is defined and used to calibrate the sensitivity of each function. The following cost functions were implemented:
-* Car Speed Cost: Penalize paths where the nearest car in the path has a speed lower than the road speed limit.
+In order to decide which State shall be executed for the FSM, a set of cost functions was designed. The main goals of the cost function are to keep the car at the highest speed possible (obeying the road speed limit) and also avoid collision with other vehicles. For each cost function, a parametrized weight is defined and used to calibrate the sensitivity of each function. The following cost functions were implemented:
+* Car Speed Cost: Penalize paths where the nearest car in the path has a speed slower than the road speed limit.
   - cost = 1 - (targetCarSpeed - 50)
 * Car Distance Cost: Penalize paths where the nearest car in the path is close to the ego car. The maximum range of actuation is 75m.
   - cost = exp( -5 * (min(targetCarDistance, 75.0) / 75.0))
-* Change Lane Cost: Try to keep the car in the current lane in order to avoid unnecessary lane change, for confort reasons.
+* Change Lane Cost: Try to keep the car in the current lane in order to avoid unnecessary lane change, for comfort reasons.
   - cost = Constant Value
 
 ## Path Generator
 
-Based on the current lane as starting point and the goal lane as ending point, a path is create based on a list of widely spaced (x, y) waypoints, evenly spaced at 30m, then the waypoints are interpolated with a spline and filled in with more points that control speed.
-Instead of always generating a new trajectory from scracth for each iteraction, the last waypoints from the previous spline are used in order to always have a smooth transition between the last trajectory and the current one. Using this technique the jerk value stays under safety range.
-It was used the [spline C++ tool](http://kluge.in-chemnitz.de/opensource/spline/) for generating the spline trajectory. The next image demonstrate a path using this strategy:
+Based on the current lane as the starting point and the goal lane as the ending point, a path is created based on a list of widely spaced (x, y) waypoints, evenly spaced at 30m, then the waypoints are interpolated with a spline and filled in with more points that control speed.
+Instead of always generating a new trajectory from scratch for each interaction, the last waypoints from the previous spline are used in order to always have a smooth transition between the last trajectory and the current one. Using this technique the jerk value stays under the safety range.
+It was used the [spline C++ tool](http://kluge.in-chemnitz.de/opensource/spline/) for generating the spline trajectory. The next image demonstrates a path using this strategy:
 
 ![alt text][image2]
 
 ## Example
 
-Follows an demonstration of the result of the Behavior Planner and the Trajectory Generator in action:
+Follows a demonstration of the result of the Behavior Planner and the Trajectory Generator in action:
 
 ![alt text][video1]
+
